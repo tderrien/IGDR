@@ -1,0 +1,8 @@
+35	miRNA	exon	24922095	24922220	.	+	.	gene_id "ENSCAFG00000028084"; transcript_id "ENSCAFT00000042367"; gene_type "miRNA"; transcript_type "miRNA";
+38	miRNA	exon	24941432	24941513	.	-	.	gene_id "ENSCAFG00000030525"; transcript_id "ENSCAFT00000046301"; gene_type "miRNA"; transcript_type "miRNA";
+X	miRNA	exon	25582501	25582575	.	-	.	gene_id "ENSCAFG00000031136"; transcript_id "ENSCAFT00000047317"; gene_type "miRNA"; transcript_type "miRNA";
+3	miRNA	exon	25758587	25758657	.	-	.	gene_id "ENSCAFG00000029319"; transcript_id "ENSCAFT00000044211"; gene_type "miRNA"; transcript_type "miRNA";
+35	processed_pseudogene	exon	26048935	26049582	.	-	.	gene_id "ENSCAFG00000012123"; transcript_id "ENSCAFT00000019263"; gene_type "processed_pseudogene"; transcript_type "processed_pseudogene";
+3	protein_coding	CDS	23469028	23469109	.	+	0	gene_id "ENSCAFG00000010536"; transcript_id "ENSCAFT00000016760"; gene_type "protein_coding"; transcript_type "protein_coding";
+3	protein_coding	CDS	23469843	23469942	.	+	2	gene_id "ENSCAFG00000010536"; transcript_id "ENSCAFT00000016760"; gene_type "protein_coding"; transcript_type "protein_coding";
+3	protein_coding	CDS	23470044	23470098	.	+	1	gene_id "ENSCAFG00000010536"; transcript_id "ENSCAFT00000016760"; gene_type "protein_coding"; transcript_type "protein_coding";

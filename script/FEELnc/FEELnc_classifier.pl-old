@@ -1,0 +1,157 @@
+#!/usr/bin/perl -w
+
+
+=head1 NAME
+
+FEELnc_classifier.pl - Classify .gtf file A (lncRNA) versus .gtf file B
+
+=head1 SYNOPSIS
+
+FEELnc_classifier.pl  -a lncRNA.gtf -b mRNA.gtf [options]
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-a|infileA>
+
+Input .gtf fileA. [mandatory]
+
+=item B<-b|infileB>
+
+Input .gtf fileB. [mandatory]
+
+
+=item B<-p|proc>
+
+Number of threads  [default 4].
+
+=item B<-v|verbosity>
+
+Level of verbosity [default 0].
+
+=item B<-help>
+
+Print a brief help message and exits.
+
+=item B<-man>
+
+Prints the manual page and exits.
+
+=back
+
+=head1 DESCRIPTION
+
+B<This program> will parse 2 .gtf files and return the classes of file A versus B
+
+=cut
+
+# Perl libs
+use warnings;
+use strict;
+no strict 'refs'; # https://metacpan.org/pod/FileCache
+
+use Getopt::Long;
+use Pod::Usage;
+use File::Basename;
+use Data::Dumper;
+use Cwd;
+use Parallel::ForkManager; # in /local/perl/5.12.2/lib/site_perl/5.12.2/Parallel/ForkManager.pm
+
+
+# Own lib : /home/genouest/umr6061/recomgen/tderrien/bin/ThomasPerl/lib/
+use Parser;
+use ExtractFromHash;
+use Interactions;
+use Utils;
+
+my $progname=basename($0);
+
+# Variables
+my $infileA='';
+my $infileB='';
+my $max_proc = 8;
+my $window = 1000; 
+my $filterout = "none"; 
+my $stranded = 0;
+my $man = 0;
+my $help = 0;
+my $verbosity=10;
+
+## Parse options and print usage if there is a syntax error,
+## or if usage was explicitly requested.
+GetOptions('a|infilea=s' => \$infileA,
+   'b|infileb=s' => \$infileB,
+   'p|proc=i' => \$max_proc,   
+   'w|window=i' => \$window,      
+   'f|filterout=s' => \$filterout,      
+   'v|verbosity=i' => \$verbosity,
+   'help|?' => \$help,
+   'man' => \$man
+) or pod2usage(2);
+
+# Help and man
+pod2usage(1) if $help;
+pod2usage(-verbose => 2) if $man;
+
+# Test parameters
+pod2usage("Error: Cannot read your input .gtf file A '$infileA'...\nFor help, see:\n$progname --help\n") unless( -r $infileA);
+pod2usage("Error: Cannot read your input .gtf file B '$infileB'...\nFor help, see:\n$progname --help\n") unless( -r $infileB);
+
+
+my %hA_chr  = Parser::parseGTFSplitchr($infileA, 'exon', $verbosity);
+my %hB_chr  = Parser::parseGTFSplitchr($infileB, 'exon', $verbosity);
+
+
+
+# Launch forks
+my $pm = Parallel::ForkManager->new($max_proc); # using the system temp dir $L<File::Temp::tempdir()
+
+
+# data structure retrieval and handling
+# see: https://metacpan.org/pod/Parallel::ForkManager#RETRIEVING-DATASTRUCTURES-from-child-processes
+my %interaction_chr = ();  # for collecting responses
+$pm -> run_on_finish (
+  sub {
+		my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $result_ref) = @_;
+		my $chr = $ident;
+
+		warn("Child $chr killed by signal $exit_signal"), return if $exit_signal;
+		warn("Child $chr exited with error $exit_code"),  return if $exit_code;
+		warn("Child $chr encountered an unknown error"),  return if !$result_ref;
+
+	   $interaction_chr{$chr} = $result_ref;
+  }
+);
+
+# Process 2 directories
+foreach my $chrA (keys %hA_chr ) {
+
+	my %h;
+	
+	foreach my $chrB (keys %hB_chr ) {
+	
+		next if ($chrA ne $chrB);
+                
+		# start fork
+	    my $pid = $pm->start($chrB) and next;
+     	
+     	# get ref on hash per chromosome
+     	my $refh1 = $hA_chr{$chrA};
+        my $refh2 = $hB_chr{$chrB};        
+        
+        # Launch interactionCollection
+		print STDERR "$chrB\n";
+		%h = Interactions::InteractionCollection($refh1, $refh2, $window, $filterout, $verbosity);
+    }
+    # end fork
+    $pm->finish(0, \%h);
+
+}
+# wait all sub process
+$pm->wait_all_children;
+
+
+print Dumper \%interaction_chr;
+
+ 

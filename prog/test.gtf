@@ -1,0 +1,9 @@
+10	broad	exon	247829	252562	.	-	.	gene_id "RLOC_00000001"; transcript_id "ENPP10"; transcript_biotype "protein_coding"; 
+10	broad	exon	254466	254628	.	-	.	gene_id "RLOC_00000001"; transcript_id "ENPP10"; transcript_biotype "protein_coding"; 
+2	broad	exon	256197	256329	.	-	.	gene_id "RLOC_00000001"; transcript_id "ENPP2"; transcript_biotype "protein_coding"; 
+X	broad	exon	257162	257242	.	-	.	gene_id "RLOC_00000001"; transcript_id "ENPPx"; transcript_biotype "protein_coding"; 
+X	broad	exon	261834	261963	.	-	.	gene_id "RLOC_00000001"; transcript_id "ENPPx"; transcript_biotype "protein_coding"; 
+1	broad	exon	10	15	.	+	.	gene_id "RLOC_00000001"; transcript_id "ENPP1"; transcript_biotype "protein_coding"; 
+1	broad	exon	265578	265629	.	+	.	gene_id "RLOC_00000001"; transcript_id "ENPP1"; transcript_biotype "protein_coding"; 
+1	broad	exon	1	5	.	+	.	gene_id "RLOC_00000001"; transcript_id "ENPP1"; transcript_biotype "protein_coding"; 
+1	broad	exon	100	500	.	+	.	gene_id "RLOC_00000001"; transcript_id "ENPP10000"; transcript_biotype "protein_coding"; 
