@@ -104,6 +104,8 @@ for my $tr (keys %{$h}){
 		my $s	= $exon->{"start"};
 		my $e	= $exon->{"end"};
 
+# 		print STDERR "$tr $chr:$s-$e\n";
+		
 		if ( $cpt == 1){ 												# if first, we add $slop bp to START
 			$seqstring   	.=  $db->seq($chr, $s - $slop => $e);
 		} elsif ($cpt == scalar(@{$h->{$tr}->{"feature"}})) {

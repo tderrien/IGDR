@@ -642,9 +642,9 @@ sub getCumulSizeFromGtfHash{
 		
 			#compute size
 			my $size			=	cumulSize($refh->{$tr}->{"feature"});
-			$store_size{$tr}	= $size;
+ 			$refh->{$tr}->{"size"}	=	$size;
 		}
-		return \%store_size;
+		return $refh;
 
 
 	} else { # MODE: get longest transcript per locus

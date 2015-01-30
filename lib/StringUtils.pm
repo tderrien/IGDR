@@ -39,6 +39,7 @@ sub getSubSequenceFasta{
 sub getRevComp {
 
 	my ($sequence, $verbosity)	= @_; 
+	#print STDERR "Sequence : $sequence\n";
 	warn "Utils::getRevComp: Your input sequence is empty\n" if ($sequence eq "" && $verbosity > 5);
 
 	$sequence 	=~tr/ACGTacgtNn/TGCAtgcaNn/;

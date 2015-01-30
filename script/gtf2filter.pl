@@ -28,6 +28,7 @@ my $man 		= 0;
 my $help 		= 0;
 my $verbosity	= 0;
 
+my $longest		=	0; # extract longest tx per locus
 
 my $minsize         = 200;
 my $biexonicsize	= 25;
@@ -41,7 +42,8 @@ GetOptions(
     's|size=i' 			=> \$minsize,
     'biex=i' 			=> \$biexonicsize,    
     'monoex=i' 			=> \$monoexonic,
-	"f|filter=s"		=> \%filtertag,	
+	"f|filter=s"		=> \%filtertag,
+	'longest!'			=> \$longest,
 	'v|verbosity=i'		=> \$verbosity,
 	'help|?' 			=> \$help,
 	'man' 				=> \$man
@@ -99,10 +101,18 @@ print STDERR "> Filter biexonicsize ($biexonicsize): $ctdubious\n";
 print STDERR ">> Transcripts left after fitler(s): ",scalar keys (%{$reflnc}),"\n";
 
 # Get longest transcripts per gene
-my $longest		=	1;
-my $reflnc_long	=	ExtractFromHash::getCumulSizeFromGtfHash($reflnc,  $verbosity, $longest);
+if ($longest) {
+	print STDERR "Extract longest tx per locus : $longest\n";
+	my $reflnc_long	=	ExtractFromHash::getCumulSizeFromGtfHash($reflnc,  $verbosity, $longest);
 
-ExtractFromHash::printGTF($reflnc_long, 'all',  $verbosity);
+	ExtractFromHash::printGTF($reflnc_long, 'all',  $verbosity);
+	
+} else {
+
+	ExtractFromHash::printGTF($reflnc, 'all',  $verbosity);
+
+}
+
 
 
 
@@ -148,8 +158,9 @@ Filter a .GTF file w.r.t to different user criteria
   -s,--size=200			Keep transcript with a minimal size (default 200)
   --monoex=0|1			Keep monoexonic transcript(s): mode to be selected from :  1 keep all monoexonic, 0 remove all monoexonic	[default 0]
   --biex=25			Discard biexonic transcripts having one exon size lower to this value (default 25)
+  --longest			get longest tx per locus (default 'FALSE')
   
-=head2 Overlapping specification 
+  	
 
 =head1 AUTHORS
 
