@@ -36,6 +36,9 @@ my $genome    ="/home/genouest/umr6061/recomgen/tderrien/canFam3/sequence/softma
 # my $genome    ="/omaha-beach/tderrien/DATA/hg19/"; # for human
 my $slop                = 0;        # nb of extranucleotide around transcript
 my $outfile             = undef;    # name of the output file (defaut stdout)
+my $cds					= 0;		# only extract CDS sequence (from start to stop) [default FALSE]
+my $fullcds				= 0;		# only extract full length CDS sequence i.e only those that have a START and END codon [default FALSE]
+
 my $help                = 0;
 my $verbose             = 0;
 my $man;
@@ -45,14 +48,16 @@ my %filtertag;
 
 # Parsing parameters
 GetOptions(
-	"infile|i=s"			=> \$infile,
-	"outfile|o=s"			=> \$outfile,
-	"slop|s=i"				=> \$slop,
-	"f|filter=s"            => \%filtertag,	
-	"genome|g=s"			=> \$genome,
-	"verbose|v=i"			=> \$verbose,	
-	"man|m"					=> \$man,	
-	"help|?"				=> \$help) or pod2usage(2);	
+	"infile|i=s"		=> \$infile,
+	"genome|g=s"		=> \$genome,
+	"outfile|o=s"		=> \$outfile,
+	"slop|s=i"			=> \$slop,
+	"f|filter=s"        => \%filtertag,	
+	"cds|c!"			=> \$cds,	
+	"fullcds!"			=> \$fullcds,	
+	"verbose|v=i"		=> \$verbose,	
+	"man|m"				=> \$man,	
+	"help|?"			=> \$help) or pod2usage(2);	
 
 # Print help if needed
 pod2usage(1) if $help;
@@ -66,7 +71,12 @@ pod2usage("I need a valid genome file or directory: '$genome'\n") if  (! -r $gen
 
 
 # Parse file at the exon level
-my $h		= Parser::parseGTF($infile, 'exon', 0, \%filtertag , $verbose);
+my $h;		
+if ($cds || $fullcds){
+	$h	=	Parser::parseGTF($infile, 'CDS,stop_codon', 0, \%filtertag , $verbose); # WARNING, we still include stop codon since it is not part of the CDS by defintion
+}else{
+	$h	= Parser::parseGTF($infile, 'exon', 0, \%filtertag , $verbose);
+}
 
 
 
@@ -94,17 +104,20 @@ for my $tr (keys %{$h}){
 	#Initalize sequence:
 	my $seqstring	=	"";
 	my $id_sequence	=	"";
-	my $cpt=0;
+	my $cpt			= 	0;
+	my $chr 		=	$h->{$tr}->{"chr"};
+	
+	if (!defined($db->seq($chr, 0 => 10))){
+		warn "WARNING: $tr is on chr '$chr' which is not a chromosome of the genome fasta file : $genome... Skip this tx!\n";
+		next;
+	}
 
 	
 	foreach my $exon (@{$h->{$tr}->{"feature"}}) {
 		
 		$cpt++;
-		my $chr = $h->{$tr}->{"chr"};
 		my $s	= $exon->{"start"};
 		my $e	= $exon->{"end"};
-
-# 		print STDERR "$tr $chr:$s-$e\n";
 		
 		if ( $cpt == 1){ 												# if first, we add $slop bp to START
 			$seqstring   	.=  $db->seq($chr, $s - $slop => $e);
@@ -114,6 +127,7 @@ for my $tr (keys %{$h}){
 			$seqstring   	.=  $db->seq($chr, $s => $e);				# else no slop
 		}
     }
+    
     
 	#RevComp if strand -
 	if ( $h->{$tr}->{"strand"} eq '-'|| $h->{$tr}->{"strand"} eq '-1') {
@@ -127,16 +141,38 @@ for my $tr (keys %{$h}){
 	my $tx_biot	=	ExtractFromFeature::getKeyFromFeature($h, $tr, 'transcript_biotype', $verbose);
 	my $id		= $tr."_".$h->{$tr}->{"gene_id"}."_".$h->{$tr}->{"strand"}."_".$h->{$tr}->{"chr"}.":".$h->{$tr}->{"startt"}."-".$h->{$tr}->{"endt"}."_".$tx_biot;
 	my $new_seq = Bio::Seq->new(-id => $id, -seq => $seqstring);
+	
+	# If full CDS has to be checked
 
-	$seqOUT->write_seq($new_seq);
+	if ($fullcds){
+		
+		if (checkDnaStartStop($new_seq->seq())){
+			$seqOUT->write_seq($new_seq);
+		} else{
+		
+			warn "WARNINGS: $tr: Option --fullcds is activated but start and/or stop codons is not found\n";
+		}
+	} else {
+		$seqOUT->write_seq($new_seq);		
+	}
 
 	if ($verbose > 0){
         Utils::showProgress($h_transcript_size, $i++, "Print ".$tr.": ");
     }
 
 }
-    
 
+
+# Check if full CDS
+sub checkDnaStartStop {
+my ($seq) = @_;
+	
+	if (defined ($seq) && $seq=~m/^ATG/i && $seq =~m/TAA$|TAG$|TGA$/i){
+		return 1;
+	} else {
+		return 0;
+	}
+}
 
 __END__
 
@@ -158,6 +194,10 @@ Options:
 	--filter|-f	: filtering attributes such as key=val (-f chr=X,34 -f transcript_biotype=lincRNA,antisense) [default: undef]
 
 	--slop|-s	: number of nucleotide to be added in 5' and 3' of the transcript sequence [default: 0]
+
+	--cds|-c	: extract CDS sequence wrt to CDS features in the .GTF files (may be incomplete) [default: FALSE]
+
+	--fullcds	: extract *ONLY* full length CDS sequence wrt to CDS, start_codon, stop_codon features in the .GTF files [default: FALSE]
 	
 	--outfile|-o	: output file name [default : STDOUT]
 	
@@ -180,6 +220,12 @@ Options:
 
 =item B<--outfile|-o>
 : output file name
+
+=item B<--cds|-c>
+: extract CDS sequence wrt to CDS features in the .GTF files [default: FALSE]
+
+=item B<--fullcds>
+: extract *ONLY* full length CDS sequence wrt to CDS, start_codon, stop_codon features in the .GTF files [default: FALSE]
 
 =item B<--slop|-s>
 : number of nucleotide to be added in 5' and 3' of the transcript sequence
