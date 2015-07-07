@@ -29,9 +29,7 @@ my $progname=basename($0);
 my $infileA		='';
 my $infileB		='';
 my $uniquexa 	= 0 ;
-my $uniquexb 	= 0 ;
-my $common		= 1;
-my $fraction 	= 1 ;
+my $minfrac_over 	= 0 ;
 my $proc 		= 4;
 my $strandedmode= 0; # default unstranded
 my $man 		= 0;
@@ -43,10 +41,8 @@ my $verbosity	= 0;
 GetOptions(
 	'a|infileA=s'	 	=> \$infileA,
 	'b|infileB=s'	 	=> \$infileB,	
-	'ea|uniquexa!' 		=> \$uniquexa,
-	'eb|uniquexb!' 		=> \$uniquexb,
-	'c|common!' 		=> \$common,
-	'f|fraction=f' 		=> \$fraction,	
+	'va|uniquexa!' 		=> \$uniquexa,
+	'f|fraction=f' 		=> \$minfrac_over,	
 	's|strandmode=i' 	=> \$strandedmode,
 	'p|proc=i' 			=> \$proc,
 	'v|verbosity=i'		=> \$verbosity,
@@ -58,28 +54,28 @@ GetOptions(
 pod2usage(1) if $help;
 pod2usage(-exitval=>0, -verbose=>2) if $man;
 
-print STDERR "Options:\n- infileA: $infileA\n- infileB: $infileB\n- uniquexa: $uniquexa\n- uniquexb: $uniquexb\n- common: $common\n" if ($verbosity > 5);
+print STDERR "Options:\n- infileA: $infileA\n- infileB: $infileB\n- uniquexa: $uniquexa\n- minfrac_over: $minfrac_over\n- strandedmode: $strandedmode\n" if ($verbosity > 5);
 
 # Test parameters
 pod2usage("Error: Cannot read your input A .gtf file '$infileA'...\nFor help, see:\n$progname --help\n") unless( -r $infileA);
 pod2usage("Error: Cannot read your input B .gtf file '$infileB'...\nFor help, see:\n$progname --help\n") unless( -r $infileB);
-pod2usage ("- Error: \$fraction option '$fraction' should be a float between 0 and 1 [0-1] (e.g 0.5 if 50% overlap is required)\n") unless ($fraction >= 0 and $fraction <= 1);
+pod2usage ("- Error: \$minfrac_over option '$minfrac_over' should be a float between 0 and 1 [0-1] (e.g 0.5 if 50% overlap is required)\n") unless ($minfrac_over >= 0 and $minfrac_over <= 1);
 
-pod2usage("Error: Cannot report common tx while unique A or B activated. Use '--no-common' option to exclude matching tx.\n\nFor help, see:\n$progname --help\n") if( ($common && $uniquexa) || ($common && $uniquexb));
+# pod2usage("Error: Cannot report common tx while unique A or B activated. Use '--no-common' option to exclude matching tx.\n\nFor help, see:\n$progname --help\n") if( $common && $uniquexa);
 pod2usage ("- Error: \$strandedmode option '$strandedmode' should be 0 (unstranded mode comparison), 1 (same strand) or -1 (for opposite strand e.g antisense)\n") if ($strandedmode !=0 && $strandedmode !=1 && $strandedmode != -1 );
 
 
 my $splitbychr	=	1;
 my $parseextraf	=	undef;
-
+my %biotype;
 # Parsing
-my $hA_chr		= Parser::parseGTF($infileA, 'exon',  $splitbychr, $parseextraf , $verbosity);
-my $hB_chr		= Parser::parseGTF($infileB, 'exon',  $splitbychr, $parseextraf , $verbosity);
+my $hA_chr		= Parser::parseGTF($infileA, 'exon',  $splitbychr, \%biotype , $verbosity);
+my $hB_chr		= Parser::parseGTF($infileB, 'exon',  $splitbychr, \%biotype , $verbosity);
 
 
 # Launch parralel
 my $pm = Parallel::ForkManager->new($proc);
-my %retrieved_responses = ();  # for collecting responses
+my %refhchild = ();  # for collecting responses
 $pm -> run_on_finish (
   sub {
 		my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $result_ref) = @_;
@@ -89,22 +85,15 @@ $pm -> run_on_finish (
 		warn("Child $chr exited with error $exit_code"),  return if $exit_code;
 		warn("Child $chr encountered an unknown error"),  return if !$result_ref;
 
-	   $retrieved_responses{$chr} = $result_ref;
+	   $refhchild{$chr} = $result_ref;
   }
 );
 
 # For option uniqueA or B, we need to check whether some txs are specific of ONE chromosome
 # that will be miss by the chr to chr comparison
 my $refarray_chrA;
-my $refarray_chrB;	
-if (!$common){
-	# get chromosomes of A that are not in B in an arrayref and reciproc
-	if ($uniquexa){
-		$refarray_chrA	=	compare_chr_distrib($hA_chr, $hB_chr);
-	}
-	if ($uniquexb){
-		$refarray_chrB	=	compare_chr_distrib($hB_chr, $hA_chr);
-	}
+if ($uniquexa){
+	$refarray_chrA	=	compare_chr_distrib($hA_chr, $hB_chr);
 }
 
 # we collect all chromosome-specific transcript in a hash
@@ -114,21 +103,17 @@ my %h_diffchr=();
 # Process 2 hashes
 foreach my $chrA (keys %{$hA_chr} ) {
 
-	# for common, we collect response in array @inter of hashes such as
+ 	# array tmp storing tx IDs to remove, the correct hash is : $refhchild
 	# 	$VAR1 = [
 	#           {
 	#             'ENSCAFT00000000121' => 'ENSCAFT00000000121',
 	#             'ENSCAFT00000000971' => 'ENSCAFT00000000971',
 	# 		}
 	# 		]			
-	my @inter;
-	
-	# for unique of A and/or B
-	# just a hash of tx ids
-	my %h;
+	my @pairs;
 	
 	# Test if chrA not in B so we put that in %h_diffchr
-	if (!$common && $uniquexa && grep $_ eq $chrA, @{$refarray_chrA} ){
+	if ($uniquexa && grep $_ eq $chrA, @{$refarray_chrA} ){
 		$h_diffchr{$chrA} = $hA_chr->{$chrA};
 		next;
 	}
@@ -136,60 +121,68 @@ foreach my $chrA (keys %{$hA_chr} ) {
 	# 2n chromosome
 	foreach my $chrB (keys %{$hB_chr} ) {
 
-		# Test if chrB not in A so we put that in %h_diffchr
-		if (!$common && $uniquexb && grep $_ eq $chrB, @{$refarray_chrB} ){
-			$h_diffchr{$chrB} = $hB_chr->{$chrB};
-			next;
-		}
 		
 		next if ($chrA ne $chrB);
                 
 		# start fork
-	    my $pid = $pm->start($chrB) and next;
-     	
-     	# get ref on hash per chromosome
-     	my $refh1 = $hA_chr->{$chrA};
-        my $refh2 = $hB_chr->{$chrB};        
-        
+	    my $pid = $pm->start($chrB) and next; 
         
         # Launch interactionCollection
 		print STDERR "$chrB\n" if ($verbosity > 0);
 		# Launch Intersect
-		if (!$common){
-			%h = Intersect::Intersect2HsplitFork_compare($refh1, $refh2, $strandedmode, $uniquexa, $uniquexb, $common, $fraction, $verbosity);
-		} else {
-			@inter = Intersect::Intersect2HsplitFork_compare($refh1, $refh2, $strandedmode, $uniquexa, $uniquexb, $common, $fraction, $verbosity);
-		}
+
+		# Get all tx from A that intersect with B 
+		# 			* wrt to strand and fraction option (i.e restricted by -s)
+		# 			* in format such chr => {A1	=> B1}
+		#						    	=>  {A2	=> B1}
+		# 								=>  .....
+		@pairs = Intersect::getIntersect($hA_chr->{$chrA}, $hB_chr->{$chrB}, $strandedmode, $minfrac_over, $verbosity);
     }
     # end fork
-    if (!$common){
-		$pm->finish(0, \%h);
-	} else {
-	    $pm->finish(0, \@inter);
-	}
+	$pm->finish(0, @pairs);
 }
 
 # wait all sub process
 $pm->wait_all_children;
 
+# print Dumper \%refhchild;
 
-print STDERR "\n";
+if ($uniquexa){
+	# remove matching transcripts from hash of process chr
+	foreach my $thread (keys %refhchild){
+    	my @arayofhash =  @{$refhchild{$thread}};
+#     	print Dumper \@arayofhash;
+    	my @idstorm;
+    	for my $ref (@arayofhash){
+			push @idstorm, keys %{$ref};
+    	}
+# 		print STDERR "Filter because  $_ - $idstorm[$_]...\n" for (@idstorm);
+    	
+    	delete @{$hA_chr->{$thread}}{@idstorm} ;  
+    }
+}
+
+
 # Merge 2 hashes of file-specific transcripts if !$common
 my %final_diff;
-if (!$common){
-	%final_diff  = (%retrieved_responses, %h_diffchr);
+if ($uniquexa){
+	%final_diff  = (%{$hA_chr}, %h_diffchr);
 } 
 
 
+
+# ########
+# # OUTPUT
+# #########
 ########
 # OUTPUT
 #########
 # If option $common, we print a double GTF
-if ($common){
+if (!$uniquexa){
 	# Parse good transcripts by chr
-	foreach my $chr (keys %retrieved_responses ) {
+	foreach my $chr (keys %refhchild ) {
 		# in option $common $retrieved_responses{$chr} is a array ref
-		ExtractFromHash::printDoubleGTF($hA_chr->{$chr}, $hB_chr->{$chr}, $retrieved_responses{$chr}, 'all',  $verbosity)
+		ExtractFromHash::printDoubleGTF($hA_chr->{$chr}, $hB_chr->{$chr}, $refhchild{$chr}, 'all',  $verbosity)
 	}
 } else { # else we print simple GTF
 	foreach my $chr (keys %final_diff ) {
@@ -254,9 +247,6 @@ write transcript(s) from A NOT matching transcripts from B ... [default FALSE ]
 
 - use --no-common to apply this option
 
-=item B<-eb|uniquexb>
-
-write transcript(s) from B NOT matching transcripts from A ... [default FALSE ]
 
 - restricted by -c
 
@@ -264,7 +254,7 @@ write transcript(s) from B NOT matching transcripts from A ... [default FALSE ]
 
 =item B<-f|fraction>
 
-Minimum overlap required as a fraction of A [default : 1 (100% overlap) ].
+Minimum overlap required as a fraction of A [default : 0 (1 nt overlap) ].
 
 =item B<-s|strandmode>
 
