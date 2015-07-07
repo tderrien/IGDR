@@ -20,6 +20,8 @@ use strict;
 use Bio::SeqIO;
 use Getopt::Long;
 use Pod::Usage;
+
+use Data::Dumper;
 ############################# Parameters #################################################
 
 
@@ -97,30 +99,49 @@ if (defined $filter){
 ###############################
 # Create SeqIO objects 
 my $seqin  = Bio::SeqIO->new(-file => $infile,      -format => "fasta");
+
+
+
+# put sequence in array to keep filter order
+my @seqArr;
+while (my $seq = $seqin->next_seq()) {
+	# need to deal with spaces
+	#$seq->desc( $seq->id . " ". $seq->desc);
+	push(@seqArr, $seq);
+}
+
+############################################################
+
 my $seqout = Bio::SeqIO->new( -format => "fasta");
 
 
 # if filter is ids or file of ids
 if (scalar @filter > 0){
 
-	while(my $seq = $seqin->next_seq) {
+	# Keep ordered according to @filter
+	foreach my $fid (@filter){
+		foreach my $seq (@seqArr) {
 
-		if ($orf){
+			next if ($fid ne $seq->id);
 
-			if (checkDnaStartStop($seq->seq())){
-				$seqout->write_seq($seq) if (grep {$_ eq $seq->id} @filter);
+			if ($orf){
+
+				if (checkDnaStartStop($seq->seq())){
+					$seqout->write_seq($seq);
+				}
+			} else {
+				$seqout->write_seq($seq);
 			}
-		} else {
-			$seqout->write_seq($seq) if (grep {$_ eq $seq->id} @filter);
 		}
 	}
 # if range
 }else{
 	if($min >0 && $max >0) {
 	
+		#print "$min $max ok\n";
 		my $count=0;
 	
-		while(my $seq = $seqin->next_seq) {
+		foreach my $seq (@seqArr) {
 
 			$count++;
 			if ($orf){
@@ -133,7 +154,7 @@ if (scalar @filter > 0){
 			}
 		}
 	}else {
-		print "Error in extracting sequence...\n";
+		print STDERR "Error in extracting sequence...\n";
 	}
 }
 
