@@ -9,6 +9,7 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
 use Bio::DB::Fasta;
+use Data::Dumper;
 
 # Lib perso
 use Parser;
@@ -21,11 +22,11 @@ use Orf;
 # Variables
 my $infile		= "";
 my $genome		= "";
-my $tx_biotype	= "";
+my %biotype;
 my $man 		= 0;
 my $help 		= 0;
 my $verbosity	= 0;
-
+my $forceall	= 0; # to we fore prediction on already annotated CDS
 my $progname=basename($0);
 
 
@@ -38,7 +39,8 @@ my $splitbychr = 0;
 GetOptions(
 	'i|infile=s'	 	=> \$infile,
 	'g|genome=s' 		=> \$genome,
-	'b|biotype:s' 		=> \$tx_biotype,
+	'b|biotype=s'       => \%biotype,	
+	'f|force!'			=> \$forceall,
 	'v|verbosity=i'		=> \$verbosity,
 	'help|?' 			=> \$help,
 	'man' 				=> \$man
@@ -54,23 +56,34 @@ pod2usage("Error: Cannot read your genome file '$genome'...\nFor help, see:\n$pr
 
 
 #######################
-# Parse GTF file
-my $h		= Parser::parseGTF($infile, 'exon', $splitbychr, $tx_biotype , $verbosity);
+# Parse GTF file with exon and CDS informations
+my $h		= Parser::parseGTF($infile, 'exon,CDS,stop_codon', $splitbychr, \%biotype, $verbosity);
+# my $h		= Parser::parseGTF($infile, 'exon', $splitbychr, $tx_biotype , $verbosity);
 
 my $sizeh = keys(%{$h});
 my $i=0;
 
-for my $tr (keys(%{$h})){
+for my $tr (keys(%{$h})) {
 
 	my $chr = $h->{$tr}->{'chr'};
 	my $strand = $h->{$tr}->{'strand'};
 
+	if (ExtractFromFeature::checkCDS($h->{$tr}->{'feature'})){
+	
+		if ($forceall) {
+			warn "$tr : CDS already annotated and force option is activated... CDS will be  reannotated...\n" if ($verbosity > 1);
+			
+		} else {
+			warn "$tr : CDS already annotated and force option is NOT activated... CDS will not be reannotated...\n" if ($verbosity > 1);
+			next;
+		}
+	}
 	# get cDNA sequence for transcript tr
 	my $seq = ExtractFromFeature::feature2seq($h->{$tr}->{'feature'}, $genome, $chr , $strand, 0, $verbosity);
 	
 	# select best ORF
 	my $orf_selected =  Orf::chooseORF($seq);
-	
+		
 	# get values of the transcript with CDS/UTR
 	my $refh = ExtractFromFeature::Tx2CDS($h->{$tr}, $orf_selected);
 
@@ -111,10 +124,15 @@ full path to a multi-fasta file with the genomic sequences
       for all input features, OR a directory with single-fasta files
       (one per genomic sequence, with file names matching sequence names)
 
+=item B<-f|--force>
+
+Force the reannotation of CDS transcript that is already annotated in the original .GTF [default FALSE].
+
 
 =item B<-v|verbosity>
 
 Level of verbosity [default 0].
+
 
 =item B<-help>
 
