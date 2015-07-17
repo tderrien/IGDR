@@ -89,7 +89,7 @@ $pm -> run_on_finish (
   }
 );
 
-# For option uniqueA or B, we need to check whether some txs are specific of ONE chromosome
+# For option uniqueA, we need to check whether some txs are specific to ONE chromosome
 # that will be miss by the chr to chr comparison
 my $refarray_chrA;
 if ($uniquexa){
@@ -231,26 +231,10 @@ Input A .gtf file. [mandatory]
 
 Input B .gtf file. [mandatory]
 
-=item B<-c|common>
-
-write matching transcript(s) between  A and B files... [default TRUE ]
-
-- restricted by -f
-
-- print a double GTF in output
-
-=item B<-ea|uniquexa>
+=item B<-va|uniquexa>
 
 write transcript(s) from A NOT matching transcripts from B ... [default FALSE ]
 
-- restricted by -c
-
-- use --no-common to apply this option
-
-
-- restricted by -c
-
-- use --no-common to apply this option
 
 =item B<-f|fraction>
 
