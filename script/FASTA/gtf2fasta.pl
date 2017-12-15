@@ -1,1 +1,1 @@
-../gtf2fasta.pl
+/home/genouest/umr6061/recomgen/tderrien/bin/perl/IGDR/script/gtf2fasta.pl

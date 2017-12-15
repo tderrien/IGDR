@@ -8,7 +8,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
-
+use Data::Dumper;
 
 # Own lib : /home/genouest/umr6061/recomgen/tderrien/bin/ThomasPerl/lib/
 use Parser;
@@ -28,13 +28,23 @@ my $man 		= 0;
 my $help 		= 0;
 my $verbosity	= 0;
 
+# Extract 10 first sequences by default
+my $rangefilter 	=	undef;
+my ($min, $max)= 0,0;
+
+
+
+my $minsize         = 0;
+my $biexonicsize	= 0;
+my $monoexonic      = 1; # -1 keep monoexonicAS, 1 keep all monoexonic, 0 remove all monoexonic
+						 # restricted by $linconly
+
+#my $has_complete_ORF	=	0 # if 1, will only get transcript having start and stop codon annotated (some transcript do not have cds_{start,end}_NF while they do not start or finish by start or stop e.g ENST00000429039 ih GRCH37/hg19)
+								# see /home/genouest/umr6061/recomgen/dog/script/FEELnc++/data/human/randomTxperGene/without_cds_end-start_NF/error.id
+
 my $longest		=	0; # extract longest tx per locus
 my $random		=	0; # extract one random tx per locus
 
-my $minsize         = 200;
-my $biexonicsize	= 25;
-my $monoexonic      = 0; # -1 keep monoexonicAS, 1 keep all monoexonic, 0 remove all monoexonic
-						 # restricted by $linconly
 
 ## Parse options and print usage if there is a syntax error,
 ## or if usage was explicitly requested.
@@ -44,6 +54,7 @@ GetOptions(
     'biex=i' 			=> \$biexonicsize,    
     'monoex=i' 			=> \$monoexonic,
 	"f|filter=s"		=> \%filtertag,
+	"n|number=s"		=> \$rangefilter,
 	'longest!'			=> \$longest,
 	'r|random!'			=> \$random,
 	'v|verbosity=i'		=> \$verbosity,
@@ -60,6 +71,7 @@ pod2usage("Error: Cannot read your input GTF file '$infile'...\nFor help, see:\n
 pod2usage ("- Error: --monoex option '$monoexonic' should be 1 keep all monoexonic, 0 remove all monoexonic \n") if ($monoexonic != 0 and $monoexonic != 1 );
 
 #############################################################
+
 
 
 # Parsing candidate lncRNAs
@@ -101,6 +113,27 @@ print STDERR "> Filter size ($minsize): $ctminsize\n";
 print STDERR "> Filter monoexonic ($monoexonic): $ctmonoexonic\n";
 print STDERR "> Filter biexonicsize ($biexonicsize): $ctdubious\n";
 print STDERR ">> Transcripts left after fitler(s): ",scalar keys (%{$reflnc}),"\n";
+
+my $filt_reflnc;
+if (defined $rangefilter){
+
+	if (index($rangefilter, '-') != -1) { # if range
+		($min, $max) = split /-/, $rangefilter;
+		if ($max<$min){my $temp=$max; $max=$min;$min=$temp}
+		print STDERR "Extracting txs by NUMBER from: $min->$max\n";
+
+		# get tx_ids from hash in array
+		my @k = keys(%{$reflnc});
+		# subselect from min to max tx
+		my @sk= @k[$min .. $max];
+		%{$reflnc} = map { $_ => $reflnc->{$_}} @sk;
+
+	}
+}
+
+
+
+
 
 # Get longest transcripts per gene
 if ($longest) {
@@ -205,12 +238,17 @@ Filter a .GTF file w.r.t to different user criteria
 =head2 Filtering arguments
 
   -f,--filter			filtering attributes such as key=val (-f chr=X,34 -f transcript_biotype=lincRNA,antisense) [default: undef]
-  -s,--size=200			Keep transcript with a minimal size (default 200)
-  --monoex=0|1			Keep monoexonic transcript(s): mode to be selected from :  1 keep all monoexonic, 0 remove all monoexonic	[default 0]
-  --biex=25			Discard biexonic transcripts having one exon size lower to this value (default 25)
-  --longest			get longest tx per locus (default 'FALSE')
+  -n,--number			range of tx to be extract (-n 0-9 extract 10 first transcripts... WARNINGs with hash order) [default undef]
+  -s,--size=0			Keep transcript with a minimal size (default >0)
+  --monoex=0|1			Keep monoexonic transcript(s): mode to be selected from :  1 keep all monoexonic, 0 remove all monoexonic	[default 1]
+  --biex=0			Discard biexonic transcripts having one exon size lower to this value (default >0)
+  --longest			get longest tx per locus ... following filters (default 'FALSE')
+  -r,--random 			get random tx per locus ... following filters (default 'FALSE')
   
-  	
+
+$ perl extract_fasta.pl -i infile.fa  B<-f 1-10>
+
+: will extract 10 first sequences from infile.fa  	
 
 =head1 AUTHORS
 

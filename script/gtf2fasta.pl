@@ -18,7 +18,7 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 
-use lib '/home/genouest/umr6061/recomgen/tderrien/bin/perl/lib/';
+#use lib '/home/genouest/umr6061/recomgen/tderrien/bin/perl/lib/';
 # use lib '/home/genouest/umr6061/recomgen/tderrien/src/bioperl-1.2.3';
 
 # Own package
@@ -73,6 +73,8 @@ pod2usage("I need a valid genome file or directory: '$genome'\n") if  (! -r $gen
 # Parse file at the exon level
 my $h;		
 if ($cds || $fullcds){
+	warn "CDS option 'cds=$cds , fullcds=$fullcds' activated...\n **only CDS and stop_codon lines will be parsed**\n";
+	sleep(3);
 	$h	=	Parser::parseGTF($infile, 'CDS,stop_codon', 0, \%filtertag , $verbose); # WARNING, we still include stop codon since it is not part of the CDS by defintion
 }else{
 	$h	= Parser::parseGTF($infile, 'exon', 0, \%filtertag , $verbose);
