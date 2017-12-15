@@ -12,16 +12,26 @@
 #
 #
 # Usage : 
-# 	 specificity_score.pl gene_matrix.rpkm | column -t 
-
+# 	 specificity_score.pl matrix.rpkm | column -t 
+#
+# Example matrix.rpkm
+# ID           HAIRFOLLICULE  ADRENALGLAND  CORTEX  GUTCOLON  JEJUNUM  KERATINOCYTE  MAMMARYGLAND_GSMD  OLFBULB_GSMD  PANCREAS
+# XLOC_000019  47             552           91      15        93       0             29                 14            6
+# XLOC_000030  46             20            10      22        3        12            20                 0             1
+# XLOC_000031  0              239           0       0         0        0             0                  0             0
+# XLOC_000032  1              0             57      0         0        0             0                  190           0
+# XLOC_000041  218            301           415     350       171      67            366                246           71
+# XLOC_000052  0              0             60      7         2        0             0                  169           0
 ########################################################
+
+
 use strict;
 use warnings;
 use Data::Dumper;
 use List::Util qw(max sum first);
 
 my $infile 	= shift or die "Usage: $0 MATRIX_FILE\n";
-my $minexpr =   1; # minimum expression
+my $minexpr =   1; # minimum expression level 
 
 open (my $fh , "<" , $infile) or die "Cannot open < $infile: $!";
 
@@ -50,7 +60,7 @@ while (<$fh>){
 close ($fh);
 
 
-
+# Subfunction to compute as in Yanai et al. : sum(1-(d/max(d)))/(length(d)-1)
 sub getTSscore {
 
     my ($vec, $header)  =   @_;
